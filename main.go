@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -24,8 +27,73 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+func validateChirp(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	var params parameters
+	err := json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	if len(params.Body) > 140 {
+		writeErrorJson(w, errors.New("chirp is too long"), "Chirp is too long")
+		return
+	}
+
+	cleanedBody := replaceProfane(params.Body)
+
+	writeSuccessJson(w, cleanedBody)
+}
+
+func writeErrorJson(w http.ResponseWriter, err error, message ...string) {
+	log.Printf("Error: %s", err)
+
+	type response struct {
+		Error string `json:"error"`
+	}
+	resp := response{Error: strings.Join(message, " ")}
+
+	w.WriteHeader(http.StatusBadRequest)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func writeSuccessJson(w http.ResponseWriter, message ...string) {
+	type response struct {
+		CleanedBody string `json:"cleaned_body"`
+	}
+	resp := response{CleanedBody: strings.Join(message, " ")}
+
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func replaceProfane(body string) string {
+	words := strings.Split(body, " ")
+	newBody := []string{}
+	for _, word := range words {
+		w := strings.TrimSpace(strings.ToLower(word))
+		switch w {
+		case "kerfuffle",
+			"sharbert",
+			"fornax":
+			newBody = append(newBody, "****")
+		default:
+			newBody = append(newBody, word)
+		}
+	}
+	return strings.Join(newBody, " ")
+}
+
 func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(fmt.Sprint("Hits: ", cfg.fileserverHits.Load())))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	out := fmt.Sprintf("<html>\n  <body>\n    <h1>Welcome, Chirpy Admin</h1>\n    <p>Chirpy has been visited %d times!</p>\n  </body>\n</html>", cfg.fileserverHits.Load())
+	w.Write([]byte(out))
 }
 
 func (cfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
@@ -45,11 +113,11 @@ func main() {
 	handle := http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(handle))
 
-	mux.HandleFunc("/healthz", healthz)
+	mux.HandleFunc("GET /api/healthz", healthz)
+	mux.HandleFunc("POST /api/validate_chirp", validateChirp)
 
-	mux.HandleFunc("/metrics", apiCfg.metricsHandler)
-
-	mux.HandleFunc("/reset", apiCfg.resetHandler)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
+	mux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 
