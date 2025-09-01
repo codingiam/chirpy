@@ -65,6 +65,7 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", healthz)
 
 	mux.HandleFunc("POST /api/users", cfg.createUser)
+	mux.HandleFunc("PUT /api/users", cfg.updateUser)
 
 	mux.HandleFunc("POST /api/login", cfg.createSession)
 	mux.HandleFunc("POST /api/refresh", cfg.refreshSession)
