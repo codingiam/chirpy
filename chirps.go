@@ -138,3 +138,49 @@ func (cfg *apiConfig) showChirp(w http.ResponseWriter, r *http.Request) {
 
 	writeSuccessJson(w, resp)
 }
+
+func (cfg *apiConfig) deleteChirp(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	chirp, err := cfg.sql.GetChirpByID(r.Context(), chirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	if chirp.UserID != userID {
+		w.WriteHeader(http.StatusForbidden)
+		writeErrorJson(w, errors.New("not owner"), "Something went wrong")
+		return
+	}
+
+	err = cfg.sql.DeleteChirpByID(r.Context(), chirp.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeErrorJson(w, err, "Something went wrong")
+	}
+
+	writeSuccessJson(w, nil, http.StatusNoContent)
+}
