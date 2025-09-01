@@ -46,3 +46,13 @@ func TestGetBearerToken(t *testing.T) {
 		t.Fatalf("Bearer token does not match")
 	}
 }
+
+func TestMakeRefreshToken(t *testing.T) {
+	token, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(token) != 64 {
+		t.Fatalf("Token length does not match")
+	}
+}

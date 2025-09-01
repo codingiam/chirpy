@@ -26,7 +26,9 @@ func writeSuccessJson(w http.ResponseWriter, resp any, statusCode ...int) {
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	_ = json.NewEncoder(w).Encode(resp)
+	if resp != nil {
+		_ = json.NewEncoder(w).Encode(resp)
+	}
 }
 
 func healthz(w http.ResponseWriter, r *http.Request) {

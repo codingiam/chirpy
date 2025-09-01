@@ -2,9 +2,9 @@ package main
 
 import (
 	"codingiam/chirpy/internal/auth"
+	"codingiam/chirpy/internal/database"
 	"encoding/json"
 	"errors"
-	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -16,9 +16,8 @@ func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	var params parameters
@@ -48,23 +47,94 @@ func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	duration := 1 * time.Hour
-	if params.ExpiresInSeconds > 0 {
-		duration = time.Duration(math.Min(float64(duration), float64(time.Duration(params.ExpiresInSeconds)*time.Second)))
-	}
 	jwt, err := auth.MakeJWT(user.ID, cfg.secret, duration)
 	if err != nil {
 		writeErrorJson(w, err, "Something went wrong")
 		return
 	}
 
-	type response struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
-		Token     string    `json:"token"`
+	token, err := auth.MakeRefreshToken()
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
 	}
-	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, jwt}
+
+	_, err = cfg.sql.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     token,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(60 * 24 * time.Hour),
+	})
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	type response struct {
+		ID           uuid.UUID `json:"id"`
+		CreatedAt    time.Time `json:"created_at"`
+		UpdatedAt    time.Time `json:"updated_at"`
+		Email        string    `json:"email"`
+		Token        string    `json:"token"`
+		RefreshToken string    `json:"refresh_token"`
+	}
+	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, jwt, token}
 
 	writeSuccessJson(w, resp)
+}
+
+func (cfg *apiConfig) refreshSession(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	refreshToken, err := cfg.sql.GetRefreshTokenByToken(r.Context(), token)
+	if err != nil || refreshToken.ExpiresAt.Before(time.Now()) {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	duration := 1 * time.Hour
+	jwt, err := auth.MakeJWT(refreshToken.UserID, cfg.secret, duration)
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	type response struct {
+		Token string `json:"token"`
+	}
+	resp := response{jwt}
+
+	writeSuccessJson(w, resp)
+}
+
+func (cfg *apiConfig) revokeSession(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	refreshToken, err := cfg.sql.GetRefreshTokenByToken(r.Context(), token)
+	if err != nil || refreshToken.ExpiresAt.Before(time.Now()) {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	_, err = cfg.sql.RevokeRefreshTokenByToken(r.Context(), token)
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+	writeSuccessJson(w, nil, http.StatusNoContent)
 }
