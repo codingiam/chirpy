@@ -96,7 +96,12 @@ func (cfg *apiConfig) indexChirps(w http.ResponseWriter, r *http.Request) {
 		authorID = uuid.NullUUID{UUID: userID, Valid: true}
 	}
 
-	chirps, err := cfg.sql.GetChirps(r.Context(), authorID)
+	sort := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("sort")))
+	if sort != "ASC" && sort != "DESC" {
+		sort = "ASC"
+	}
+
+	chirps, err := cfg.sql.GetChirps(r.Context(), database.GetChirpsParams{UserID: authorID, Sort: sort})
 	if err != nil {
 		writeErrorJson(w, err, "Something went wrong")
 		return
