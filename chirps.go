@@ -1,6 +1,7 @@
 package main
 
 import (
+	"codingiam/chirpy/internal/auth"
 	"codingiam/chirpy/internal/database"
 	"encoding/json"
 	"errors"
@@ -15,8 +16,7 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	var params parameters
@@ -33,9 +33,23 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 
 	cleanedBody := replaceProfane(params.Body)
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
 	chirp, err := cfg.sql.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleanedBody,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		writeErrorJson(w, err, "Something went wrong")
@@ -49,14 +63,14 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 		Body      string    `json:"body"`
 		UserID    uuid.UUID `json:"user_id"`
 	}
-	resp := response{chirp.ID, chirp.CreatedAt, chirp.UpdatedAt, cleanedBody, params.UserID}
+	resp := response{chirp.ID, chirp.CreatedAt, chirp.UpdatedAt, cleanedBody, userID}
 
 	writeSuccessJson(w, resp, http.StatusCreated)
 }
 
 func replaceProfane(body string) string {
 	words := strings.Split(body, " ")
-	newBody := []string{}
+	var newBody []string
 	for _, word := range words {
 		w := strings.TrimSpace(strings.ToLower(word))
 		switch w {

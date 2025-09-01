@@ -4,6 +4,7 @@ import (
 	"codingiam/chirpy/internal/auth"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -15,8 +16,9 @@ func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password         string `json:"password"`
+		Email            string `json:"email"`
+		ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
 	}
 
 	var params parameters
@@ -45,13 +47,24 @@ func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	duration := 1 * time.Hour
+	if params.ExpiresInSeconds > 0 {
+		duration = time.Duration(math.Min(float64(duration), float64(time.Duration(params.ExpiresInSeconds)*time.Second)))
+	}
+	jwt, err := auth.MakeJWT(user.ID, cfg.secret, duration)
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
 	type response struct {
 		ID        uuid.UUID `json:"id"`
 		CreatedAt time.Time `json:"created_at"`
 		UpdatedAt time.Time `json:"updated_at"`
 		Email     string    `json:"email"`
+		Token     string    `json:"token"`
 	}
-	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email}
+	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, jwt}
 
 	writeSuccessJson(w, resp)
 }

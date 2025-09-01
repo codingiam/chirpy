@@ -16,6 +16,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	sql            *database.Queries
 	platform       string
+	secret         string
 }
 
 func main() {
@@ -30,6 +31,11 @@ func main() {
 	platform := os.Getenv("PLATFORM")
 	if platform == "" {
 		log.Fatal("PLATFORM must be set")
+	}
+
+	secret := os.Getenv("SECRET")
+	if secret == "" {
+		log.Fatal("SECRET must be set")
 	}
 
 	dbURL := os.Getenv("DB_URL")
@@ -48,6 +54,7 @@ func main() {
 		fileserverHits: atomic.Int32{},
 		sql:            dbQueries,
 		platform:       platform,
+		secret:         secret,
 	}
 
 	mux := http.NewServeMux()

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -34,5 +35,14 @@ func TestJWT(t *testing.T) {
 	}
 	if decodedUUID != userID {
 		t.Fatalf("UUID does not match")
+	}
+}
+
+func TestGetBearerToken(t *testing.T) {
+	headers := http.Header{}
+	headers.Add("Authorization", "bearer TOKEN_STRING")
+
+	if token, _ := GetBearerToken(headers); token != "TOKEN_STRING" {
+		t.Fatalf("Bearer token does not match")
 	}
 }
