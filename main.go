@@ -105,6 +105,35 @@ func (cfg *apiConfig) indexChirps(w http.ResponseWriter, r *http.Request) {
 	writeSuccessJson(w, resp)
 }
 
+func (cfg *apiConfig) showChirp(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	chirp, err := cfg.sql.GetChirpByID(r.Context(), chirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		writeErrorJson(w, err, "Something went wrong")
+		return
+	}
+
+	type response struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body      string    `json:"body"`
+		UserID    uuid.UUID `json:"user_id"`
+	}
+	resp := response{chirp.ID, chirp.CreatedAt, chirp.UpdatedAt, chirp.Body, chirp.UserID}
+
+	writeSuccessJson(w, resp)
+}
+
 func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -239,6 +268,7 @@ func main() {
 	mux.HandleFunc("POST /api/users", cfg.createUser)
 	mux.HandleFunc("POST /api/chirps", cfg.createChirp)
 	mux.HandleFunc("GET /api/chirps", cfg.indexChirps)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", cfg.showChirp)
 
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHandler)
