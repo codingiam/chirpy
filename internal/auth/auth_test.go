@@ -2,6 +2,9 @@ package auth
 
 import (
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestPasswordHashing(t *testing.T) {
@@ -15,5 +18,21 @@ func TestPasswordHashing(t *testing.T) {
 	err = CheckPasswordHash(password, passwordHash)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestJWT(t *testing.T) {
+	userID := uuid.New()
+	tokenSecret := "secret"
+	jwt, err := MakeJWT(userID, tokenSecret, 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decodedUUID, err := ValidateJWT(jwt, tokenSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decodedUUID != userID {
+		t.Fatalf("UUID does not match")
 	}
 }
