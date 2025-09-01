@@ -2,7 +2,6 @@ package main
 
 import (
 	"codingiam/chirpy/internal/auth"
-	"codingiam/chirpy/internal/database"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	type parameters struct {
@@ -33,15 +32,16 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedPassword, err := auth.HashPassword(params.Password)
+	user, err := cfg.sql.GetUserByEmail(r.Context(), email)
 	if err != nil {
-		writeErrorJson(w, err, "Something went wrong")
+		writeErrorJson(w, err, "Couldn't get user")
 		return
 	}
 
-	user, err := cfg.sql.CreateUser(r.Context(), database.CreateUserParams{email, hashedPassword})
+	err = auth.CheckPasswordHash(params.Password, user.HashedPassword)
 	if err != nil {
-		writeErrorJson(w, err, "Couldn't create user")
+		w.WriteHeader(http.StatusUnauthorized)
+		writeErrorJson(w, err, "Incorrect email or password")
 		return
 	}
 
@@ -53,5 +53,5 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email}
 
-	writeSuccessJson(w, resp, http.StatusCreated)
+	writeSuccessJson(w, resp)
 }
