@@ -37,11 +37,12 @@ func healthz(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
-func validateChirp(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	type parameters struct {
-		Body string `json:"body"`
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
 	}
 
 	var params parameters
@@ -58,12 +59,25 @@ func validateChirp(w http.ResponseWriter, r *http.Request) {
 
 	cleanedBody := replaceProfane(params.Body)
 
-	type response struct {
-		CleanedBody string `json:"cleaned_body"`
+	chirp, err := cfg.sql.CreateChirp(r.Context(), database.CreateChirpParams{
+		Body:   cleanedBody,
+		UserID: params.UserID,
+	})
+	if err != nil {
+		writeErrorJson(w, err, "Something went wrong")
+		return
 	}
-	resp := response{CleanedBody: cleanedBody}
 
-	writeSuccessJson(w, resp)
+	type response struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+		Body      string    `json:"body"`
+		UserID    uuid.UUID `json:"user_id"`
+	}
+	resp := response{chirp.ID, chirp.CreatedAt, chirp.UpdatedAt, cleanedBody, params.UserID}
+
+	writeSuccessJson(w, resp, http.StatusCreated)
 }
 
 func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
@@ -169,8 +183,15 @@ func main() {
 	const port = "8080"
 
 	platform := os.Getenv("PLATFORM")
+	if platform == "" {
+		log.Fatal("PLATFORM must be set")
+	}
 
 	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		log.Fatal("DB_URL must be set")
+	}
+
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalln(err)
@@ -190,8 +211,8 @@ func main() {
 	mux.Handle("/app/", cfg.middlewareMetricsInc(handle))
 
 	mux.HandleFunc("GET /api/healthz", healthz)
-	mux.HandleFunc("POST /api/validate_chirp", validateChirp)
 	mux.HandleFunc("POST /api/users", cfg.createUser)
+	mux.HandleFunc("POST /api/chirps", cfg.createChirp)
 
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHandler)
