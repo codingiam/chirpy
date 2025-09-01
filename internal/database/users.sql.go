@@ -104,7 +104,7 @@ type UpdateUserIsChirpyRedParams struct {
 	IsChirpyRed bool
 }
 
-func (q *Queries) UpdateUserIsChirpyRed(ctx context.Context, arg UpdateUserIsChirpyRedParams) error {
+func (q *Queries) UpdateUserIsChirpyRed(ctx context.Context, arg UpdateUserIsChirpyRedParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, updateUserIsChirpyRed, arg.ID, arg.IsChirpyRed)
 	var i User
 	err := row.Scan(
@@ -115,5 +115,5 @@ func (q *Queries) UpdateUserIsChirpyRed(ctx context.Context, arg UpdateUserIsChi
 		&i.HashedPassword,
 		&i.IsChirpyRed,
 	)
-	return err
+	return i, err
 }

@@ -38,7 +38,7 @@ func (cfg *apiConfig) polkaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := params.Data.UserID
-	err = cfg.sql.UpdateUserIsChirpyRed(r.Context(), database.UpdateUserIsChirpyRedParams{
+	_, err = cfg.sql.UpdateUserIsChirpyRed(r.Context(), database.UpdateUserIsChirpyRedParams{
 		ID: userID, IsChirpyRed: true,
 	})
 	if err != nil {

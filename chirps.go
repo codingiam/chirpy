@@ -88,7 +88,15 @@ func replaceProfane(body string) string {
 func (cfg *apiConfig) indexChirps(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	chirps, err := cfg.sql.GetChirps(r.Context())
+	var authorID uuid.NullUUID
+
+	paramAuthorID := r.URL.Query().Get("author_id")
+	userID, err := uuid.Parse(paramAuthorID)
+	if err == nil {
+		authorID = uuid.NullUUID{UUID: userID, Valid: true}
+	}
+
+	chirps, err := cfg.sql.GetChirps(r.Context(), authorID)
 	if err != nil {
 		writeErrorJson(w, err, "Something went wrong")
 		return
