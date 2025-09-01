@@ -46,12 +46,13 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type response struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
+		ID          uuid.UUID `json:"id"`
+		CreatedAt   time.Time `json:"created_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
+		Email       string    `json:"email"`
+		IsChirpyRed bool      `json:"is_chirpy_red"`
 	}
-	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email}
+	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, user.IsChirpyRed}
 
 	writeSuccessJson(w, resp, http.StatusCreated)
 }
@@ -104,12 +105,13 @@ func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type response struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
-		Email     string    `json:"email"`
+		ID          uuid.UUID `json:"id"`
+		CreatedAt   time.Time `json:"created_at"`
+		UpdatedAt   time.Time `json:"updated_at"`
+		Email       string    `json:"email"`
+		IsChirpyRed bool      `json:"is_chirpy_red"`
 	}
-	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email}
+	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, user.IsChirpyRed}
 
 	writeSuccessJson(w, resp)
 }

@@ -76,8 +76,9 @@ func (cfg *apiConfig) createSession(w http.ResponseWriter, r *http.Request) {
 		Email        string    `json:"email"`
 		Token        string    `json:"token"`
 		RefreshToken string    `json:"refresh_token"`
+		IsChirpyRed  bool      `json:"is_chirpy_red"`
 	}
-	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, jwt, token}
+	resp := response{user.ID, user.CreatedAt, user.UpdatedAt, user.Email, jwt, token, user.IsChirpyRed}
 
 	writeSuccessJson(w, resp)
 }
